@@ -55,10 +55,9 @@ read -p "Vuoi vedere come creare la shortcut sulla schermata home? (s/n): " risp
 case "${risp,,}" in
     s|si|y|yes)
         echo ""
-        echo "1. Installa l'app Termux:Widget (dalla stessa fonte di Termux, es. F-Droid)"
-        echo "2. Tieni premuto sulla schermata home e apri Widget"
-        echo "3. Cerca Termux:Widget e trascina il widget sulla home"
-        echo "4. Scegli \"$LOCAL_NAME\" dall'elenco"
+        echo "1. Tieni premuto sulla schermata home e apri Widget"
+        echo "2. Cerca Termux:Widget e trascina il widget sulla home"
+        echo "3. Scegli \"$LOCAL_NAME\" dall'elenco"
         ;;
 esac
 #endregion
