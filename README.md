@@ -12,4 +12,4 @@ bash <(curl -fsSL https://raw.githubusercontent.com/gaetron/just-sh-poket/main/i
 
 message for linux users:
 can yall try it on different distros?
-i dont reaaally know how they work and i would like an hand on discovering were it works natively
+i dont really know how they work and i would like an hand on discovering were it works natively
