@@ -373,6 +373,22 @@ EOF
         exec bash "$(readlink -f "${BASH_SOURCE[0]}")"
     fi
 
+    if [ "$scelta" = "xdupate" ] || [ "$scelta" = "xdupdate" ]; then
+        SCRIPT_FILE="$(readlink -f "${BASH_SOURCE[0]}")"
+        echo "Scarico l'ultima versione da GitHub..."
+        if curl -fsSL "https://raw.githubusercontent.com/gaetron/just-sh-poket/main/%28poket%29just.sh" -o "$SCRIPT_FILE.tmp" \
+            && head -n1 "$SCRIPT_FILE.tmp" | grep -q '^#!' \
+            && bash -n "$SCRIPT_FILE.tmp"; then
+            cp "$SCRIPT_FILE" "$SCRIPT_FILE.bak"
+            mv "$SCRIPT_FILE.tmp" "$SCRIPT_FILE"
+            exec bash "$SCRIPT_FILE"
+        else
+            rm -f "$SCRIPT_FILE.tmp"
+            echo "Aggiornamento non riuscito: controlla la connessione. Script invariato."
+            sleep 2
+        fi
+    fi
+    
     if [ -n "$scelta" ] && [ "$scelta" -ge 1 ] 2>/dev/null && [ "$scelta" -le 10 ] 2>/dev/null; then
         "utility$scelta"
     fi
