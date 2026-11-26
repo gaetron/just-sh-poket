@@ -279,6 +279,91 @@ utility3() {
 }
 #endregion
 
+#region utility4 - library manager
+utility4() {
+    local -a TYPES NAMES VERS
+    local n k last mark cmd action num kind name ver
+
+    lib_protected() {
+        case "$1:$2" in
+            pkg:bash|pkg:coreutils|pkg:sed|pkg:grep|pkg:gawk|pkg:findutils|pkg:termux-tools|pkg:termux-core|pkg:termux-exec|pkg:termux-keyring|pkg:apt|pkg:dpkg|pkg:curl|pkg:python|pkg:python-pip|pip:pip|pip:setuptools|pip:wheel) return 0 ;;
+        esac
+        return 1
+    }
+
+    while true; do
+        clear
+        TYPES=(); NAMES=(); VERS=(); n=0
+
+        while read -r name ver; do
+            [ -z "$name" ] && continue
+            n=$((n+1)); TYPES[$n]="pkg"; NAMES[$n]="$name"; VERS[$n]="$ver"
+        done < <(apt-mark showmanual 2>/dev/null | xargs -r dpkg-query -W -f='${Package} ${Version}\n' 2>/dev/null | sort)
+
+        while read -r name ver; do
+            [ -z "$name" ] && continue
+            n=$((n+1)); TYPES[$n]="pip"; NAMES[$n]="$name"; VERS[$n]="$ver"
+        done < <(pip list --disable-pip-version-check --format=freeze 2>/dev/null | sed 's/==/ /')
+
+        echo "== Librerie installate =="
+        last=""
+        for ((k=1; k<=n; k++)); do
+            if [ "${TYPES[$k]}" != "$last" ]; then
+                last="${TYPES[$k]}"
+                echo ""
+                if [ "$last" = "pkg" ]; then
+                    echo "-- pkg (pacchetti Termux) --"
+                else
+                    echo "-- pip (librerie Python) --"
+                fi
+            fi
+            mark=""
+            lib_protected "${TYPES[$k]}" "${NAMES[$k]}" && mark="  [protetto]"
+            printf "%3d  %-26s %s%s\n" "$k" "${NAMES[$k]}" "${VERS[$k]}" "$mark"
+        done
+
+        echo ""
+        echo "un@ = elimina | up@ = aggiorna | INVIO = esci"
+        read -p "> " cmd
+
+        [ -z "$cmd" ] && return 0
+
+        if [[ "$cmd" =~ ^(un|up)([0-9]+)$ ]]; then
+            action="${BASH_REMATCH[1]}"
+            num=$((10#${BASH_REMATCH[2]}))
+            if [ "$num" -ge 1 ] && [ "$num" -le "$n" ]; then
+                kind="${TYPES[$num]}"
+                name="${NAMES[$num]}"
+                echo ""
+                if [ "$action" = "un" ]; then
+                    if lib_protected "$kind" "$name"; then
+                        echo "$name è una libreria di base e non si può eliminare da qui."
+                    elif [ "$kind" = "pkg" ]; then
+                        pkg uninstall "$name"
+                    else
+                        pip uninstall "$name"
+                    fi
+                else
+                    if [ "$kind" = "pkg" ]; then
+                        pkg install -y --only-upgrade "$name"
+                    else
+                        pip install --upgrade "$name"
+                    fi
+                fi
+                echo ""
+                read -p "Premi INVIO per continuare..." _
+            else
+                echo "Numero non valido."
+                sleep 1
+            fi
+        else
+            echo "Comando non valido."
+            sleep 1
+        fi
+    done
+}
+#endregion
+
 #region funtions
 
 #region fav-funtion
@@ -339,6 +424,53 @@ fav_resolve() {
     fi
     echo "$input"
 }
+
+fav_overwrite() {
+    local util="$1" file input num link name
+    file="$(fav_file)"
+
+    if [ ! -f "$file" ] || ! awk -F'|' -v u="$util" '$1=="fav" && $2==u { found=1 } END { exit !found }' "$file"; then
+        echo "Nessun preferito salvato per la utility $util."
+        sleep 2
+        return 1
+    fi
+
+    fav_show "$util"
+    read -p "Quale preferito vuoi sovrascrivere? (numero): " input
+    num="${input#xdfav}"
+    if ! [[ "$num" =~ ^[0-9]+$ ]]; then
+        echo "Numero non valido."
+        sleep 1
+        return 1
+    fi
+    num=$((10#$num))
+
+    if ! awk -F'|' -v u="$util" -v n="$num" '$1=="fav" && $2==u && $3==n { found=1 } END { exit !found }' "$file"; then
+        echo "Il preferito xdfav$num non esiste."
+        sleep 1
+        return 1
+    fi
+
+    read -p "Nuovo link: " link
+    if [ -z "$link" ]; then
+        echo "Nessun link inserito, nulla è stato modificato."
+        sleep 1
+        return 1
+    fi
+    link="${link//|/%7C}"
+
+    read -p "Nome personalizzato (INVIO = mostra il link): " name
+    name="${name//|/ }"
+
+    NEWL="$link" NEWN="$name" awk -F'|' -v OFS='|' -v u="$util" -v n="$num" '
+        $1=="fav" && $2==u && $3==n { $4=ENVIRON["NEWN"]; $5=ENVIRON["NEWL"] }
+        { print }' "$file" > "$file.tmp" && mv "$file.tmp" "$file"
+
+    echo ""
+    echo "xdfav$num aggiornato (utility $util)."
+    read -p "Premi INVIO per continuare..." _
+}
+
 #endregion
 
 #region share-funtion
@@ -405,6 +537,7 @@ if [ "$1" = "--share" ]; then
     share_menu "$2"
 fi
 #endregion
+
 #endregion
 
 #region menu
@@ -422,7 +555,7 @@ while true; do
 
  ################################################
  |  1-yt-dlp             ||  2-neofetch+        |
- |  3-netscan            ||  4-null             |
+ |  3-netscan            ||  4-library manager  |
  |  5-null               ||  6-null             |
  |  7-null               ||  8-null             |
  |  9-null               || 10-null             |
@@ -484,8 +617,16 @@ EOF
         fav_add "${BASH_REMATCH[2]}"
     fi
 
+    if [[ "$scelta" =~ ^xdfav(ourite)?([0-9]+)[[:space:]]+[Oo][Vv]$ ]]; then
+        fav_overwrite "${BASH_REMATCH[2]}"
+    elif [[ "$scelta" =~ ^xdfav(ourite)?([0-9]+)$ ]]; then
+        fav_add "${BASH_REMATCH[2]}"
+    fi
+
     if [ -n "$scelta" ] && [ "$scelta" -ge 1 ] 2>/dev/null && [ "$scelta" -le 10 ] 2>/dev/null; then
         "utility$scelta"
     fi
+
+    
 done
 #endregion
