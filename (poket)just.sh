@@ -389,6 +389,25 @@ EOF
         fi
     fi
     
+    if [ "$scelta" = "xdinfo" ]; then
+
+        URL_INFO="https://docs.google.com/spreadsheets/d/1p2pwSReLNOqWwvcm5b43FTDhTk3uoyYco9qIMYJxy4c/edit?usp=sharing"
+
+        read -p "Vuoi aprire il link direttamente? [y/n]: " info
+        
+        if [ "${info,,}" = "y" ]; then
+            if command -v xdg-open >/dev/null 2>&1; then
+                xdg-open "$URL_INFO" >/dev/null 2>&1 &
+            else
+                echo "$URL_INFO"
+            fi
+        else
+            echo "$URL_INFO"
+            read -p "Premi INVIO per continuare..." _
+        fi
+    fi
+
+
     if [ -n "$scelta" ] && [ "$scelta" -ge 1 ] 2>/dev/null && [ "$scelta" -le 10 ] 2>/dev/null; then
         "utility$scelta"
     fi
