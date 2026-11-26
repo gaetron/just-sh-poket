@@ -53,7 +53,17 @@ utility1() {
     read -p "Formato (mp3, mp4, ecc): " formato
 
     link="$1"
-    [ -z "$link" ] && read -p "Link video: " link
+    if [ -z "$link" ]; then
+        fav_show 1
+        while true; do
+            read -p "Link video: " link
+            if resolved="$(fav_resolve 1 "$link")"; then
+                link="$resolved"
+                break
+            fi
+            echo "Preferito non trovato."
+        done
+    fi
 
     if [ "$formato" = "mp3" ]; then
         yt-dlp "${EXTRA[@]}" -x --audio-format mp3 -o "$destdir/%(title)s.%(ext)s" "$link"
@@ -269,6 +279,68 @@ utility3() {
 }
 #endregion
 
+#region funtions
+
+#region fav-funtion
+fav_file() {
+    echo "$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)/config.txt"
+}
+
+fav_add() {
+    local util="$1" file link name num
+    file="$(fav_file)"
+
+    echo ""
+    read -p "Link da salvare per la utility $util: " link
+    if [ -z "$link" ]; then
+        echo "Nessun link inserito."
+        sleep 1
+        return 1
+    fi
+    link="${link//|/%7C}"
+
+    read -p "Nome personalizzato (INVIO = mostra il link): " name
+    name="${name//|/ }"
+
+    num=$(awk -F'|' -v u="$util" '$1=="fav" && $2==u && $3+0>m { m=$3+0 } END { print m+1 }' "$file" 2>/dev/null)
+    [ -z "$num" ] && num=1
+
+    echo "fav|$util|$num|$name|$link" >> "$file"
+
+    echo ""
+    echo "Salvato come xdfav$num (utility $util)."
+    read -p "Premi INVIO per continuare..." _
+}
+
+fav_show() {
+    local file
+    file="$(fav_file)"
+    [ -f "$file" ] || return 0
+    awk -F'|' -v u="$1" '
+        $1=="fav" && $2==u {
+            if (!n) { print ""; print "Preferiti:" }
+            n++
+            label = ($4 != "") ? $4 : $5
+            printf " xdfav%s = %s\n", $3, label
+        }
+        END { if (n) print "" }' "$file"
+}
+
+fav_resolve() {
+    local util="$1" input="$2" file n saved
+    if [[ "$input" =~ ^xdfav([0-9]+)$ ]]; then
+        n="${BASH_REMATCH[1]}"
+        file="$(fav_file)"
+        [ -f "$file" ] || return 1
+        saved="$(awk -F'|' -v u="$util" -v n="$n" '$1=="fav" && $2==u && $3==n { print $5; exit }' "$file")"
+        [ -n "$saved" ] || return 1
+        echo "$saved"
+        return 0
+    fi
+    echo "$input"
+}
+#endregion
+
 #region share-funtion
 share_setup() {
     local script_file
@@ -332,6 +404,7 @@ share_setup
 if [ "$1" = "--share" ]; then
     share_menu "$2"
 fi
+#endregion
 #endregion
 
 #region menu
@@ -407,6 +480,9 @@ EOF
         fi
     fi
 
+    if [[ "$scelta" =~ ^xdfav(ourite)?([0-9]+)$ ]]; then
+        fav_add "${BASH_REMATCH[2]}"
+    fi
 
     if [ -n "$scelta" ] && [ "$scelta" -ge 1 ] 2>/dev/null && [ "$scelta" -le 10 ] 2>/dev/null; then
         "utility$scelta"
